@@ -500,3 +500,167 @@ class CMDAD_FrameLoader():
         out_batch['prompt'] = [sample['prompt'] for sample in batch]
         out_batch['gt_text'] = [sample['gt_text'] for sample in batch]
         return out_batch
+
+
+
+class SFDAD_FrameLoader():
+    def __init__(self,
+                tokenizer,
+                processor,
+                general_prompt,
+                video_type, 
+                label_type, 
+                label_width, 
+                label_alpha,
+                anno_path,
+                video_dir,
+                charbank_path,
+                **kwargs):
+        self.processor = processor
+        self.tokenizer = tokenizer
+        self.general_prompt=general_prompt
+        self.video_type = video_type
+        self.processor_mean = self.processor.image_mean
+
+        # label information, including colour coding, type, etc.
+        self.colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0], [255, 0, 255], [0, 255, 255], [255, 255, 255], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]
+        self.color_name = ["red", "green", "blue", "yellow", "pink", "cyan", "white", "black", "black", "black", "black", "black"]
+        self.label_type=label_type
+        self.label_width=label_width
+        self.label_alpha=label_alpha
+
+        # load annotation file
+        self.anno_df = pd.read_csv(anno_path)
+        #self.anno_df['num_words'] = self.anno_df.apply(lambda x: len(x['text'].strip().split()), axis=1)
+        #self.anno_df = self.anno_df[(self.anno_df['num_words'] < 64) & (self.anno_df['num_words'] > 1)]
+        #self.anno_df['num_string'] = self.anno_df.apply(lambda x: len(x['text']), axis=1)
+        #self.anno_df = self.anno_df[self.anno_df['num_string'] < 250]
+
+        # prepare character bank as dictionaries {name_id: role}
+        self.charbank_dict = {}
+        with open(os.path.join(charbank_path)) as fobj:
+            charbank_dict = json.load(fobj)
+        for key in charbank_dict.keys():
+            self.charbank_dict[key] = {single_charbank_dict["id"]:single_charbank_dict["role"] for single_charbank_dict in charbank_dict[key]}    
+
+        self.all_clips = []
+        for anno_idx, anno_row in self.anno_df.iterrows():
+            video_id = anno_row["video_id"]
+            video_path = os.path.join(video_dir, video_id + '.mkv')
+            if os.path.exists(video_path):
+                self.all_clips.append((
+                    #anno_row["imdbid"], 
+                    video_id,
+                    video_path,
+                    anno_row["start"], 
+                    anno_row["end"], 
+                    anno_row["start"], 
+                    anno_row["end"], 
+                    anno_row["text"], 
+                    anno_row["bboxes"], 
+                    anno_row["pred_ids"],
+                ))
+            #cmd_filename = anno_row['cmd_filename']
+            #video_path = os.path.join(video_dir, cmd_filename + '.mkv')
+            #if os.path.exists(video_path):
+            #    self.all_clips.append((anno_row["imdbid"], video_path, anno_row["scaled_start"], anno_row["scaled_end"], anno_row["start"], anno_row["end"], anno_row["text"], anno_row["bboxes"], anno_row["pred_ids"]))
+        print(f"In total {len(self.all_clips)} SFD-AD clips")
+
+    def __len__(self):
+        return len(self.all_clips)
+
+    def __getitem__(self, index):
+        video_id, video_path, start, end, start_, end_, gt_text, bboxes, pred_ids = self.all_clips[index]
+
+        # load 8 frames
+        frames = process_video(video_path, num_frames=8, start=start, end=end)
+
+        bboxes = ast.literal_eval(bboxes)
+
+        if self.label_type == "none":
+            processed_frames = [expand2square(frame, tuple(int(x * 255) for x in self.processor_mean)) for frame in frames]
+        else:
+            processed_frames = []
+            for frame_idx, frame in enumerate(frames):
+                if len(bboxes[frame_idx]) == 0:
+                    processed_frames.append(expand2square(frame, tuple(int(x * 255) for x in self.processor_mean)))
+                    continue
+                else:
+                    label_masks = None
+                    total_masks = None
+                    for bbox in bboxes[frame_idx]:
+                        if self.label_type=="boxes":
+                            label_mask = convert_bounding_box_to_rectangle(bbox, canvas_width=frame.size[0], canvas_height=frame.size[1], line_width=int(self.label_width / 1000 * frame.size[0]))
+                        elif self.label_type=="circles":
+                            label_mask = convert_bounding_box_to_ellipse(bbox, canvas_width=frame.size[0], canvas_height=frame.size[1], line_width=int(self.label_width / 1000 * frame.size[0]))
+                        else:
+                            print("Check the label type")
+                            sys.exit()
+
+                        # overlay label masks to get an overall mask
+                        color = np.array([255, 0, 0])
+                        if label_masks is None:
+                            label_masks = label_mask[:, :, None] * color[None, None, :]
+                            total_masks = label_mask
+                        else:
+                            label_masks = label_masks * (1 - label_mask[:, :, None]) + label_mask[:, :, None] * color[None, None, :]
+                            total_masks = np.clip(label_mask + total_masks, 0., 1.)
+
+                    # overlay the overall label mask onto the frame
+                    processed_frame = Image.fromarray((np.array(frame) * (1 - total_masks[:, :, None] * self.label_alpha) + total_masks[:, :, None] * self.label_alpha * label_masks).astype(np.uint8))
+                    processed_frame = expand2square(processed_frame, tuple(int(x * 255) for x in self.processor_mean)) 
+                    processed_frames.append(processed_frame)
+
+        video_tensor = self.processor.preprocess(processed_frames, return_tensors='pt')['pixel_values'].to(dtype=torch.float16, non_blocking=True)
+
+        # Uncomment for visualisations
+        # for frame_idx, processed_frame in enumerate(processed_frames):
+        #     os.makedirs("tmp", exist_ok = True)
+        #     filename = f"tmp/{imdbid}-{index}-{frame_idx}.jpg"
+        #     processed_frame.save(filename)
+        #     print(f"---Save file {filename} ---")
+
+        # formulate the character name text prompt
+        charbank = self.charbank_dict[video_id]
+        char_text = ". Possible characters (labeled by {label_type}): "
+        
+        for i, x in enumerate(charbank):
+            char_name = x['char_name']
+            if i == len(charbank) - 1:
+                ending = ""
+            else:
+                ending = ", "
+            
+            char_text = char_text + char_name + ending
+        
+        if char_text == ". Possible characters (labeled by {label_type}): ": # no character recognised
+            input_id, text_prompt = text_to_token(self.general_prompt.format(video_type=self.video_type, char_text="", label_type=self.label_type, duration=str(round(end_-start_, 2))), self.tokenizer)
+        else:
+            input_id, text_prompt = text_to_token(self.general_prompt.format(video_type=self.video_type, char_text=char_text.format(label_type=self.label_type), label_type=self.label_type, duration=str(round(end_-start_, 2))), self.tokenizer)
+
+        return_dict =  {
+            'video': video_tensor,
+            'imdbid': video_id,
+            'input_id': input_id,
+            'prompt': text_prompt,
+            'gt_text': gt_text,
+            'start': start,
+            'end': end,
+            'start_': start,
+            'end_': end,
+        }
+        return return_dict
+    
+    @staticmethod
+    def collate_fn(batch):
+        out_batch = {}
+        out_batch['imdbid'] = [sample['imdbid'] for sample in batch]
+        out_batch['video'] = [sample['video'] for sample in batch]
+        out_batch['start'] = [sample['start'] for sample in batch]
+        out_batch['end'] = [sample['end'] for sample in batch]
+        out_batch['start_'] = [sample['start_'] for sample in batch]
+        out_batch['end_'] = [sample['end_'] for sample in batch]
+        out_batch['input_id'] = [sample['input_id'] for sample in batch]
+        out_batch['prompt'] = [sample['prompt'] for sample in batch]
+        out_batch['gt_text'] = [sample['gt_text'] for sample in batch]
+        return out_batch

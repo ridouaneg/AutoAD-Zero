@@ -1,7 +1,7 @@
 import os
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 # modify the path below
-os.environ['TRANSFORMERS_CACHE'] = "/path/to/cache"
+os.environ['TRANSFORMERS_CACHE'] = "/home/ridouane/weights/cache_dir"
 import sys
 import torch
 import argparse

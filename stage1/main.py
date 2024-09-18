@@ -1,7 +1,7 @@
 import os
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 # modify the path below
-os.environ['TRANSFORMERS_CACHE'] = "/path/to/cache"
+os.environ['TRANSFORMERS_CACHE'] = "/home/ridouane/weights/cache_dir"
 import torch
 import argparse
 import numpy as np
@@ -10,17 +10,22 @@ from tqdm import tqdm
 
 import sys
 # modify the path below
-sys.path.append("/path/to/VideoLLaMA2/")
+sys.path.append("/home/ridouane/code/VideoLLaMA2")
 from videollama2.model.builder import load_pretrained_model
 
 from promptloader import get_general_prompt
-from dataloader import MADEval_FrameLoader, TVAD_FrameLoader, CMDAD_FrameLoader
+from dataloader import MADEval_FrameLoader, TVAD_FrameLoader, CMDAD_FrameLoader, SFDAD_FrameLoader
+
+
+tmp = """
+python stage1/main.py --dataset sfdad --video_dir /home/ridouane/data/SFD/videos --anno_path resources/annotations/sfdad_anno.csv --charbank_path resources/charbanks/sfdad_charbank_empty.json --model_path /home/ridouane/weights/cache_dir/VideoLLaMA2-7B/ --output_dir /home/ridouane/code/AutoAD-Zero/results/sfdad_no_bboxes --label_type none
+"""
 
 
 def main(args):
     # initialize VideoLLaMA2
     model_path = args.model_path
-    model_name = "VideoLLaMA2-7B" 
+    model_name = "VideoLLaMA2-7B"
     tokenizer, model, processor, context_len = load_pretrained_model(model_path, None, model_name)
     model = model.cuda()
 
@@ -36,6 +41,9 @@ def main(args):
         video_type = "movie"
     elif args.dataset == "madeval":
         D = MADEval_FrameLoader
+        video_type = "movie"
+    elif args.dataset == "sfdad":
+        D = SFDAD_FrameLoader
         video_type = "movie"
     else:
         print("Check dataset name")

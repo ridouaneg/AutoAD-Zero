@@ -111,7 +111,8 @@ def convert_bounding_box_to_ellipse(bbox, canvas_width=1280, canvas_height=720, 
 def text_to_token(question, tokenizer):
     default_mm_token = DEFAULT_MMODAL_TOKEN["VIDEO"]
     modal_token_index = MMODAL_TOKEN_INDEX["VIDEO"]
-    conv_mode = 'llama_2'
+    #conv_mode = 'llama_2'
+    conv_mode = 'llama2'
     question = default_mm_token + "\n" + question
     conv = conv_templates[conv_mode].copy()
     conv.append_message(conv.roles[0], question)
