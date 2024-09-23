@@ -505,6 +505,7 @@ class CMDAD_FrameLoader():
 
 class SFDAD_FrameLoader():
     def __init__(self,
+                anno_df,
                 tokenizer,
                 processor,
                 general_prompt,
@@ -530,7 +531,8 @@ class SFDAD_FrameLoader():
         self.label_alpha=label_alpha
 
         # load annotation file
-        self.anno_df = pd.read_csv(anno_path)
+        self.anno_df = anno_df
+        #self.anno_df = pd.read_csv(anno_path)
         #self.anno_df['num_words'] = self.anno_df.apply(lambda x: len(x['text'].strip().split()), axis=1)
         #self.anno_df = self.anno_df[(self.anno_df['num_words'] < 64) & (self.anno_df['num_words'] > 1)]
         #self.anno_df['num_string'] = self.anno_df.apply(lambda x: len(x['text']), axis=1)

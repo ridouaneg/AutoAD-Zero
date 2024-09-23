@@ -18,7 +18,8 @@ from dataloader import MADEval_FrameLoader, TVAD_FrameLoader, CMDAD_FrameLoader,
 
 
 tmp = """
-python stage1/main.py --dataset sfdad --video_dir /home/ridouane/data/SFD/videos --anno_path resources/annotations/sfdad_anno.csv --charbank_path resources/charbanks/sfdad_charbank_empty.json --model_path /home/ridouane/weights/cache_dir/VideoLLaMA2-7B/ --output_dir /home/ridouane/code/AutoAD-Zero/results/sfdad_no_bboxes --label_type none
+python stage1/main.py --dataset sfdad --video_dir /home/ridouane/data/SFD/videos --anno_path resources/annotations/sfdad_anno.csv --charbank_path resources/charbanks/sfdad_charbank_empty.json --model_path /home/ridouane/weights/cache_dir/VideoLLaMA2-7B/ --output_dir results/sfdad_no_bboxes --label_type none
+python stage1/main.py --dataset sfdad --video_dir $WORK/data/SFD/videos --anno_path resources/annotations/sfdad_anno.csv --charbank_path resources/charbanks/sfdad_charbank_empty.json --model_path $WORK/weights/VideoLLaMA2-7B/ --output_dir results/sfdad_no_bboxes --label_type none
 """
 
 
@@ -49,7 +50,14 @@ def main(args):
         print("Check dataset name")
         sys.exit()
 
-    ad_dataset = D(tokenizer=tokenizer, processor=processor, general_prompt=general_prompt, video_type = video_type,
+    anno_df = pd.read_csv(args.anno_path)
+    anno_df.sort_values(by='shot_id', inplace=True)
+
+    # Select the arg.it th chunk of the dataset
+    if args.it > 0:
+        anno_df = anno_df.iloc[args.n_subsample * args.it: args.n_subsample * (args.it + 1)]
+
+    ad_dataset = D(anno_df=anno_df, tokenizer=tokenizer, processor=processor, general_prompt=general_prompt, video_type = video_type,
                                 anno_path=args.anno_path, charbank_path=args.charbank_path, video_dir=args.video_dir,
                                 label_type=args.label_type, label_width=args.label_width, label_alpha=args.label_alpha)
               
@@ -100,9 +108,7 @@ def main(args):
             for output in outputs:
                 if len(output) > 2000: # if output length > 2000, assume it is unstable and redo the experiment
                     redo_exp = True
-                    
-
-
+                
         vids.extend(input_data["imdbid"])
         text_gt.extend(input_data["gt_text"])
         text_gen.extend(outputs) 
@@ -111,6 +117,11 @@ def main(args):
         start_sec_.extend(input_data["start_"])
         end_sec_.extend(input_data["end_"])
         
+        output_df = pd.DataFrame.from_records({'vid': vids, 'start': start_sec, 'end': end_sec, 'start_': start_sec_, 'end_': end_sec_, 'text_gt': text_gt, 'text_gen': text_gen})
+        os.makedirs(f"{args.output_dir}/{args.dataset}_ads", exist_ok=True)
+        #print(f"Save csv to {args.output_dir}/{args.dataset}_ads")
+        output_df.to_csv(f'{args.output_dir}/{args.dataset}_ads/stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}_it{args.it}.csv')
+
     output_df = pd.DataFrame.from_records({'vid': vids, 'start': start_sec, 'end': end_sec, 'start_': start_sec_, 'end_': end_sec_, 'text_gt': text_gt, 'text_gen': text_gen})
     os.makedirs(f"{args.output_dir}/{args.dataset}_ads", exist_ok=True)
     print(f"Save csv to {args.output_dir}/{args.dataset}_ads")
@@ -133,9 +144,8 @@ if __name__ == "__main__":
     parser.add_argument('--label_alpha', default=0.8, type=float)
     parser.add_argument('-j', '--num_workers', default=8, type=int, help='init mode')
     parser.add_argument('--max_exp', default=5, type=int, help='maximum number of repeating experiments')
+    parser.add_argument('--n_subsample', default=8192, type=int, help='number of subsamples')
+    parser.add_argument('--it', default=-1, type=int, help='iteration')
     args = parser.parse_args()
 
     main(args)
-
-    
-    
