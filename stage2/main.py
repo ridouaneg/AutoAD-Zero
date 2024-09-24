@@ -2,6 +2,7 @@ import os
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 # modify the path below
 os.environ['TRANSFORMERS_CACHE'] = "/home/ridouane/weights/cache_dir"
+#os.environ['TRANSFORMERS_CACHE'] = "/lustre/fswork/projects/rech/kcn/ucm72yx/weights"
 import sys
 import torch
 import argparse
@@ -13,6 +14,7 @@ from promptloader import get_user_prompt
 
 def initialise_model(access_token):
     model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    #model_id = "/lustre/fswork/projects/rech/kcn/ucm72yx/weights/Meta-Llama-3-8B-Instruct"
     pipeline = transformers.pipeline(
         "text-generation",
         model=model_id,
@@ -35,9 +37,9 @@ def summary_each(pipeline, user_prompt):
     ]
 
     prompt = pipeline.tokenizer.apply_chat_template(
-            messages, 
-            tokenize=False, 
-            add_generation_prompt=True
+        messages, 
+        tokenize=False, 
+        add_generation_prompt=True
     )
 
     terminators = [
@@ -58,7 +60,7 @@ def summary_each(pipeline, user_prompt):
     return output_text
 
 def main(args):
-     # initialise the model
+    # initialise the model
     pipeline = initialise_model(args.access_token)
    
     # read predicted output from stage 1
@@ -69,7 +71,7 @@ def main(args):
         if args.prompt_idx is None:
             args.prompt_idx = 0
         verb_list = ['look', 'walk', 'turn', 'stare', 'take', 'hold', 'smile', 'leave', 'pull', 'watch', 'open', 'go', 'step', 'get', 'enter']
-    elif args.dataset in ["cmdad", "madeval"]:
+    elif args.dataset in ["cmdad", "madeval", "sfdad"]:
         if args.prompt_idx is None:
             args.prompt_idx = 1
         verb_list = ['look', 'turn', 'take', 'hold', 'pull', 'walk', 'run', 'watch', 'stare', 'grab', 'fall', 'get', 'go', 'open', 'smile']
@@ -104,6 +106,9 @@ def main(args):
         start_sec_list.append(row['start'])
         end_sec_list.append(row['end'])
         vid_list.append(row['vid'])
+
+        output_df = pd.DataFrame.from_records({'vid': vid_list, 'start': start_sec_list, 'end': end_sec_list, 'text_gt': text_gt_list, 'text_gen': text_gen_list})
+        output_df.to_csv(os.path.join(os.path.dirname(args.pred_path), f"stage2_llama3_{args.prompt_idx}_" + os.path.basename(args.pred_path)))
 
     output_df = pd.DataFrame.from_records({'vid': vid_list, 'start': start_sec_list, 'end': end_sec_list, 'text_gt': text_gt_list, 'text_gen': text_gen_list})
     output_df.to_csv(os.path.join(os.path.dirname(args.pred_path), f"stage2_llama3_{args.prompt_idx}_" + os.path.basename(args.pred_path)))

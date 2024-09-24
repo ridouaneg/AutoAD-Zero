@@ -22,7 +22,8 @@ def process_video(video_path, num_frames=8, sample_scheme='uniform', start = Non
     Input: video path, start & end time
     Output: a list of 8 consecutive PIL images
     """
-    decord_vr = VideoReader(uri=video_path, ctx=cpu(0)) 
+    #ecord_vr = VideoReader(uri=video_path, ctx=cpu(0))
+    decord_vr = VideoReader(video_path, num_threads=1)
     duration, local_fps = len(decord_vr), float(decord_vr.get_avg_fps())
     if start is not None and end is not None:
         start_frame, end_frame = local_fps * start, local_fps * end
@@ -137,6 +138,3 @@ def read_tarfile(tar_path, img_idx):
         image_tmp.close()
         fileobj.close()
     return image
-
-
-
