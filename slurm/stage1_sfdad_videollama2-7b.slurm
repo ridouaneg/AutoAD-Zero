@@ -21,10 +21,10 @@ cd $WORK/code/AutoAD-Zero/
 python stage1/main.py \
     --dataset sfdad \
     --video_dir $WORK/data/SFD/videos \
-    --anno_path resources/annotations/sfdad_anno.csv \
-    --charbank_path resources/charbanks/sfdad_charbank_empty.json \
-    --model_path $WORK/weights/VideoLLaMA2-7B/ \
-    --output_dir results/sfdad_videollama2-7b \
+    --anno_path resources/annotations/sfdad_full_anno.csv \
+    --charbank_path resources/charbanks/sfdad_full_charbank_empty.json \
+    --model_path $WORK/weights/DAMO-NLP-SG/VideoLLaMA2-7B \
+    --output_dir results/sfdad_full_videollama2-7b \
     --label_type none \
     --iteration $SLURM_ARRAY_TASK_ID \
     --samples_per_job $SAMPLES_PER_JOB

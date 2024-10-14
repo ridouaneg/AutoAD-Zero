@@ -3,20 +3,13 @@ from tqdm import tqdm
 import json
 
 def main():
-    with_subs = True
-
     shots_path = "../resources/sfdad/shots.csv"
-    subs_path = "../resources/sfdad/subtitles.csv"
-    output_path = "../resources/annotations/sfdad_anno_with_subs.csv" if with_subs else "../resources/sfdad/annotations.csv"
-    charbank_path = "../resources/charbanks/sfdad_charbank_empty.json"
+    output_path = "../resources/annotations/sfdad_full_anno.csv"
+    charbank_path = "../resources/charbanks/sfdad_full_charbank_empty.json"
+    with_subs = False
 
     shots_df = pd.read_csv(shots_path)
-    subs_df = pd.read_csv(subs_path)
-    subs_df = subs_df[(subs_df.no_speech_prob > 0.5)]
 
-    #A = shots_df.video_id.unique()
-    #B = subs_df.video_id.unique()
-    #video_ids = set(A).intersection(B)
     video_ids = shots_df.video_id.unique()
 
     # video_id,shot_id,start,end,duration,text,bboxes,pred_ids
@@ -37,11 +30,12 @@ def main():
             duration = row['Length (seconds)']
 
             if with_subs:
-                subs_in_shot = subs_df[
-                    (subs_df['video_id'] == video_id) & 
-                    (subs_df['start'] < end) & 
-                    (subs_df['end'] > start)
-                ].sort_values(by='start')
+                #subs_in_shot = subs_df[
+                #    (subs_df['video_id'] == video_id) & 
+                #    (subs_df['start'] < end) & 
+                #    (subs_df['end'] > start)
+                #].sort_values(by='start')
+                pass
             else:
                 subs_in_shot = pd.DataFrame()
 

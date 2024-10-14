@@ -23,7 +23,7 @@ python stage1/main.py \
     --video_dir $WORK/data/SFD/videos \
     --anno_path resources/annotations/sfdad_anno.csv \
     --charbank_path resources/charbanks/sfdad_charbank_empty.json \
-    --model_path $WORK/weights/VideoLLaMA2-72B/ \
+    --model_path $WORK/weights/DAMO-NLP-SG/VideoLLaMA2-72B \
     --output_dir results/sfdad_videollama2-72b \
     --label_type none \
     --iteration $SLURM_ARRAY_TASK_ID \
