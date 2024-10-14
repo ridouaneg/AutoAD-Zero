@@ -1,27 +1,25 @@
 import os
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 # modify the path below
-os.environ['TRANSFORMERS_CACHE'] = "/home/ridouane/weights/cache_dir"
-#os.environ['TRANSFORMERS_CACHE'] = "/lustre/fswork/projects/rech/kcn/ucm72yx/weights"
+#os.environ['TRANSFORMERS_CACHE'] = "/home/ridouane/weights/cache_dir"
+os.environ['TRANSFORMERS_CACHE'] = "/lustre/fswork/projects/rech/kcn/ucm72yx/weights"
 import sys
 import torch
 import argparse
 import numpy as np
 import transformers
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import pandas as pd
 from tqdm import tqdm
 from promptloader import get_user_prompt
 
 def initialise_model(access_token):
+    weight_path = "/gpfsdswork/dataset/HuggingFace_Models"
     model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #model_id = "/lustre/fswork/projects/rech/kcn/ucm72yx/weights/Meta-Llama-3-8B-Instruct"
-    pipeline = transformers.pipeline(
-        "text-generation",
-        model=model_id,
-        model_kwargs={"torch_dtype": torch.bfloat16},
-        device_map="auto",
-        token=access_token,
-    )
+    model_path = os.path.join(weight_path, model_id)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map='auto')
+    pipeline = transformers.pipeline("text-generation", model=model, tokenizer=tokenizer)
     return pipeline
 
 def summary_each(pipeline, user_prompt):    
@@ -49,7 +47,7 @@ def summary_each(pipeline, user_prompt):
 
     outputs = pipeline(
         prompt,
-        max_new_tokens=256,
+        max_new_tokens=1024,
         eos_token_id=terminators,
         do_sample=False,
         temperature=0.6,
@@ -93,6 +91,7 @@ def main(args):
 
         # get ad summary for each prediction
         text_summary = summary_each(pipeline, user_prompt)
+        print(text_summary)
         text_summary = text_summary.replace("{'summarised_AD': '", "").replace("'}", "")
         
         # post-cleaning, output "" (empty) if the summary format is wrong
