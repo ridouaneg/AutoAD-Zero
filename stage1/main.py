@@ -1,32 +1,33 @@
-import os
-os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-# modify the path below
-os.environ['TRANSFORMERS_CACHE'] = "/home/ridouane/weights/cache_dir"
-import torch
 import argparse
-import numpy as np
-import pandas as pd
-from tqdm import tqdm
-
+import os
 import sys
-# modify the path below
-sys.path.append("/home/ridouane/code/VideoLLaMA2")
-from videollama2.model.builder import load_pretrained_model
-
-from promptloader import get_general_prompt
-from dataloader import MADEval_FrameLoader, TVAD_FrameLoader, CMDAD_FrameLoader, SFDAD_FrameLoader
-
-
-tmp = """
-python stage1/main.py --dataset sfdad --video_dir /home/ridouane/data/SFD/videos --anno_path resources/annotations/sfdad_anno.csv --charbank_path resources/charbanks/sfdad_charbank_empty.json --model_path /home/ridouane/weights/cache_dir/VideoLLaMA2-7B/ --output_dir results/sfdad_no_bboxes --label_type none
-python stage1/main.py --dataset sfdad --video_dir $WORK/data/SFD/videos --anno_path resources/annotations/sfdad_anno.csv --charbank_path resources/charbanks/sfdad_charbank_empty.json --model_path $WORK/weights/VideoLLaMA2-7B/ --output_dir results/sfdad_no_bboxes --label_type none
-"""
-
 
 def main(args):
+    # Dynamically set environment variables based on args.model_path
+    model_base_path = os.path.dirname(args.model_path)
+    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+    os.environ['TRANSFORMERS_CACHE'] = model_base_path
+    #os.environ['TRANSFORMERS_CACHE'] = "/home/ridouane/weights/cache_dir"
+    #os.environ['TRANSFORMERS_CACHE'] = "/lustre/fswork/projects/rech/kcn/ucm72yx/weights"
+
+    # Dynamically set sys.path
+    sys.path.append(os.path.join(model_base_path, "VideoLLaMA2"))
+    #sys.path.append("/home/ridouane/weights/cache_dir/VideoLLaMA2")
+    #sys.path.append("/lustre/fswork/projects/rech/kcn/ucm72yx/weights/VideoLLaMA2")
+
+    import torch
+    import numpy as np
+    import pandas as pd
+    from tqdm import tqdm
+
+    # Import local modules after updating sys.path
+    from videollama2.model.builder import load_pretrained_model
+    from promptloader import get_general_prompt
+    from dataloader import MADEval_FrameLoader, TVAD_FrameLoader, CMDAD_FrameLoader, SFDAD_FrameLoader
+
     # initialize VideoLLaMA2
     model_path = args.model_path
-    model_name = "VideoLLaMA2-7B"
+    model_name = args.model_path.split("/")[-1]
     tokenizer, model, processor, context_len = load_pretrained_model(model_path, None, model_name)
     model = model.cuda()
 
@@ -53,9 +54,8 @@ def main(args):
     anno_df = pd.read_csv(args.anno_path)
     anno_df.sort_values(by='shot_id', inplace=True)
 
-    # Select the arg.it th chunk of the dataset
-    if args.it > 0:
-        anno_df = anno_df.iloc[args.n_subsample * args.it: args.n_subsample * (args.it + 1)]
+    if args.iteration > 0:
+        anno_df = anno_df.iloc[args.samples_per_job * args.iteration: args.samples_per_job * (args.iteration + 1)]
 
     ad_dataset = D(anno_df=anno_df, tokenizer=tokenizer, processor=processor, general_prompt=general_prompt, video_type = video_type,
                                 anno_path=args.anno_path, charbank_path=args.charbank_path, video_dir=args.video_dir,
@@ -63,6 +63,9 @@ def main(args):
               
     loader = torch.utils.data.DataLoader(ad_dataset, batch_size=args.batch_size, num_workers=args.num_workers, 
                                             collate_fn=ad_dataset.collate_fn, shuffle=False, pin_memory=True)
+    
+    output_dir = f"{args.output_dir}/{args.dataset}_ads"
+    os.makedirs(output_dir, exist_ok=True)
 
     start_sec = []
     end_sec = []
@@ -116,16 +119,13 @@ def main(args):
         end_sec.extend(input_data["end"])
         start_sec_.extend(input_data["start_"])
         end_sec_.extend(input_data["end_"])
-        
+
         output_df = pd.DataFrame.from_records({'vid': vids, 'start': start_sec, 'end': end_sec, 'start_': start_sec_, 'end_': end_sec_, 'text_gt': text_gt, 'text_gen': text_gen})
-        os.makedirs(f"{args.output_dir}/{args.dataset}_ads", exist_ok=True)
-        #print(f"Save csv to {args.output_dir}/{args.dataset}_ads")
-        output_df.to_csv(f'{args.output_dir}/{args.dataset}_ads/stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}_it{args.it}.csv')
+        output_df.to_csv(os.path.join(output_dir, f'stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}_it{args.iteration}.csv'))
 
     output_df = pd.DataFrame.from_records({'vid': vids, 'start': start_sec, 'end': end_sec, 'start_': start_sec_, 'end_': end_sec_, 'text_gt': text_gt, 'text_gen': text_gen})
-    os.makedirs(f"{args.output_dir}/{args.dataset}_ads", exist_ok=True)
-    print(f"Save csv to {args.output_dir}/{args.dataset}_ads")
-    output_df.to_csv(f'{args.output_dir}/{args.dataset}_ads/stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}.csv')
+    output_df.to_csv(os.path.join(output_dir, f'stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}_it{args.iteration}.csv'))
+    print(f"Results saved to {output_dir}")
 
 
 if __name__ == "__main__":
@@ -144,8 +144,8 @@ if __name__ == "__main__":
     parser.add_argument('--label_alpha', default=0.8, type=float)
     parser.add_argument('-j', '--num_workers', default=8, type=int, help='init mode')
     parser.add_argument('--max_exp', default=5, type=int, help='maximum number of repeating experiments')
-    parser.add_argument('--n_subsample', default=8192, type=int, help='number of subsamples')
-    parser.add_argument('--it', default=-1, type=int, help='iteration')
+    parser.add_argument('--iteration', default=-1, type=int, help='iteration')
+    parser.add_argument('--samples_per_job', default=8192, type=int, help='number of subsamples')
     args = parser.parse_args()
 
     main(args)

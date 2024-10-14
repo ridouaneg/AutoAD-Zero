@@ -8,10 +8,11 @@ import numpy as np
 
 from PIL import Image
 from io import BytesIO
-from decord import VideoReader, cpu
+from decord import VideoReader
 
 # modify the path below
-sys.path.append("/path/to/VideoLLaMA2/")
+sys.path.append("/home/ridouane/weights/cache_dir/VideoLLaMA2")
+#sys.path.append("/lustre/fswork/projects/rech/kcn/ucm72yx/weights/VideoLLaMA2")
 from videollama2.conversation import conv_templates
 from videollama2.constants import DEFAULT_MMODAL_TOKEN, MMODAL_TOKEN_INDEX
 from videollama2.mm_utils import tokenizer_MMODAL_token

@@ -7,21 +7,17 @@ import sys
 import torch
 import argparse
 import numpy as np
+import torch
 import transformers
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import pandas as pd
 from tqdm import tqdm
 from promptloader import get_user_prompt
 
-def initialise_model(access_token):
-    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #model_id = "/lustre/fswork/projects/rech/kcn/ucm72yx/weights/Meta-Llama-3-8B-Instruct"
-    pipeline = transformers.pipeline(
-        "text-generation",
-        model=model_id,
-        model_kwargs={"torch_dtype": torch.bfloat16},
-        device_map="auto",
-        token=access_token,
-    )
+def initialise_model(model_path, access_token):
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map='auto')
+    pipeline = transformers.pipeline("text-generation", model=model, tokenizer=tokenizer)
     return pipeline
 
 def summary_each(pipeline, user_prompt):    
@@ -61,10 +57,14 @@ def summary_each(pipeline, user_prompt):
 
 def main(args):
     # initialise the model
-    pipeline = initialise_model(args.access_token)
+    pipeline = initialise_model(args.model_path, args.access_token)
    
     # read predicted output from stage 1
+    csv_path = os.path.join(args.pred_path, f"{args.dataset}_ads/stage1_-none-0_it{args.iteration}.csv")
     pred_df = pd.read_csv(args.pred_path)
+
+    if args.iteration > 0:
+        pred_df = pred_df.iloc[args.videos_per_job * args.iteration: args.videos_per_job * (args.iteration + 1)]
 
     # apply slightly different prompt for movie and TV series
     if args.dataset == "tvad":
@@ -78,7 +78,6 @@ def main(args):
     else:
         print("Check the dataset name")
         sys.exit()
-
 
     text_gen_list = []
     text_gt_list = []
@@ -117,13 +116,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--pred_path', default=None, type=str, help='input directory')
     parser.add_argument('--dataset', default=None, type=str)
+    parser.add_argument('--model_path', default=None, type=str, help='model path')
     parser.add_argument('--access_token', default=None, type=str, help='HuggingFace token to access llama3')
     parser.add_argument('--prompt_idx', default=None, type=int, help='optional, use to indicate you own prompt')
+    parser.add_argument('--iteration', default=-1, type=int, help='iteration')
+    parser.add_argument('--videos_per_job', default=8192, type=int, help='videos per job')
     args = parser.parse_args()
 
-    if args.access_token is None:
-        print("Please access LLaMA3 on https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct and add the access token.")
-        sys.exit()
+    #if args.access_token is None:
+    #    print("Please access LLaMA3 on https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct and add the access token.")
+    #    sys.exit()
 
     main(args)
    
