@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=extract_ads
-#SBATCH --array=0-39
+#SBATCH --array=0-19
 #SBATCH -A kcn@v100
 #SBATCH -C v100-32g
 #SBATCH --ntasks=1
@@ -11,7 +11,7 @@
 #SBATCH --output=/lustre/fswork/projects/rech/kcn/ucm72yx/slurm/extract_ads_%A_%a.out
 #SBATCH --error=/lustre/fswork/projects/rech/kcn/ucm72yx/slurm/extract_ads_%A_%a.err
 
-SAMPLES_PER_JOB=8192
+SAMPLES_PER_JOB=32768
 
 module load ffmpeg/6.1.1
 module load pytorch-gpu/py3/2.2.0

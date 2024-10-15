@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=extract_ads
-#SBATCH --array=0-9
+#SBATCH --array=0-19
 #SBATCH -A kcn@v100
 #SBATCH -C v100-32g
 #SBATCH --ntasks=1
@@ -13,6 +13,7 @@
 
 VIDEOS_PER_JOB=500
 
+#module load arch/a100
 module load ffmpeg/6.1.1
 module load pytorch-gpu/py3/2.2.0
 source $SCRATCH/virtual_envs/autoad_zero/bin/activate
@@ -21,6 +22,5 @@ cd $WORK/code/AutoAD-Zero/
 python stage2/main.py \
     --dataset sfdad \
     --model_path $DSDIR/HuggingFace_Models/meta-llama/Meta-Llama-3-8B-Instruct \
-    --pred_dir results/sfdad_videollama2-7b \
-    --iteration $SLURM_ARRAY_TASK_ID \
-    --videos_per_job $VIDEOS_PER_JOB
+    --pred_dir results/sfdad_full_videollama2-7b \
+    --iteration $SLURM_ARRAY_TASK_ID

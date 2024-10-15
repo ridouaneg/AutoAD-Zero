@@ -121,10 +121,10 @@ def main(args):
         end_sec_.extend(input_data["end_"])
 
         output_df = pd.DataFrame.from_records({'vid': vids, 'start': start_sec, 'end': end_sec, 'start_': start_sec_, 'end_': end_sec_, 'text_gt': text_gt, 'text_gen': text_gen})
-        output_df.to_csv(os.path.join(output_dir, f'stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}_it{args.iteration}.csv'))
+        output_df.to_csv(os.path.join(output_dir, f'stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}_it{args.iteration}.csv'), index=False)
 
     output_df = pd.DataFrame.from_records({'vid': vids, 'start': start_sec, 'end': end_sec, 'start_': start_sec_, 'end_': end_sec_, 'text_gt': text_gt, 'text_gen': text_gen})
-    output_df.to_csv(os.path.join(output_dir, f'stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}_it{args.iteration}.csv'))
+    output_df.to_csv(os.path.join(output_dir, f'stage1_{args.save_prefix}-{args.label_type}-{args.prompt_idx}_it{args.iteration}.csv'), index=False)
     print(f"Results saved to {output_dir}")
 
 

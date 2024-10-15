@@ -1,12 +1,6 @@
 import os
-os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-# modify the path below
-os.environ['TRANSFORMERS_CACHE'] = "/home/ridouane/weights/cache_dir"
-#os.environ['TRANSFORMERS_CACHE'] = "/lustre/fswork/projects/rech/kcn/ucm72yx/weights"
 import sys
-import torch
 import argparse
-import numpy as np
 import torch
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -14,7 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 from promptloader import get_user_prompt
 
-def initialise_model(model_path, access_token):
+def initialise_model(model_path, access_token=None):
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map='auto')
     pipeline = transformers.pipeline("text-generation", model=model, tokenizer=tokenizer)
@@ -56,15 +50,19 @@ def summary_each(pipeline, user_prompt):
     return output_text
 
 def main(args):
+    model_base_path = os.path.dirname(args.model_path)
+    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+    os.environ['TRANSFORMERS_CACHE'] = model_base_path
+
     # initialise the model
     pipeline = initialise_model(args.model_path, args.access_token)
    
     # read predicted output from stage 1
-    csv_path = os.path.join(args.pred_path, f"{args.dataset}_ads/stage1_-none-0_it{args.iteration}.csv")
-    pred_df = pd.read_csv(args.pred_path)
+    csv_path = os.path.join(args.pred_dir, f"{args.dataset}_ads/stage1_-none-0_it{args.iteration}.csv")
+    pred_df = pd.read_csv(csv_path)
 
-    if args.iteration > 0:
-        pred_df = pred_df.iloc[args.videos_per_job * args.iteration: args.videos_per_job * (args.iteration + 1)]
+    #if args.iteration > 0:
+    #    pred_df = pred_df.iloc[args.videos_per_job * args.iteration: args.videos_per_job * (args.iteration + 1)]
 
     # apply slightly different prompt for movie and TV series
     if args.dataset == "tvad":
@@ -114,13 +112,13 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pred_path', default=None, type=str, help='input directory')
+    parser.add_argument('--pred_dir', default=None, type=str, help='input directory')
     parser.add_argument('--dataset', default=None, type=str)
     parser.add_argument('--model_path', default=None, type=str, help='model path')
     parser.add_argument('--access_token', default=None, type=str, help='HuggingFace token to access llama3')
     parser.add_argument('--prompt_idx', default=None, type=int, help='optional, use to indicate you own prompt')
     parser.add_argument('--iteration', default=-1, type=int, help='iteration')
-    parser.add_argument('--videos_per_job', default=8192, type=int, help='videos per job')
+    parser.add_argument('--samples_per_job', default=8192, type=int, help='videos per job')
     args = parser.parse_args()
 
     #if args.access_token is None:
