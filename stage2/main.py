@@ -9,8 +9,13 @@ from tqdm import tqdm
 from promptloader import get_user_prompt
 
 def initialise_model(model_path, access_token=None):
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map='auto')
+    if access_token is not None:
+        tokenizer = AutoTokenizer.from_pretrained(model_path, token=access_token)
+        model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map='auto', token=access_token)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map='auto')
+    
     pipeline = transformers.pipeline("text-generation", model=model, tokenizer=tokenizer)
     return pipeline
 
@@ -58,11 +63,7 @@ def main(args):
     pipeline = initialise_model(args.model_path, args.access_token)
    
     # read predicted output from stage 1
-    csv_path = os.path.join(args.pred_dir, f"{args.dataset}_ads/stage1_-none-0_it{args.iteration}.csv")
-    pred_df = pd.read_csv(csv_path)
-
-    #if args.iteration > 0:
-    #    pred_df = pred_df.iloc[args.videos_per_job * args.iteration: args.videos_per_job * (args.iteration + 1)]
+    pred_df = pd.read_csv(args.pred_path)
 
     # apply slightly different prompt for movie and TV series
     if args.dataset == "tvad":
@@ -112,13 +113,11 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pred_dir', default=None, type=str, help='input directory')
+    parser.add_argument('--pred_path', default=None, type=str, help='input directory')
     parser.add_argument('--dataset', default=None, type=str)
     parser.add_argument('--model_path', default=None, type=str, help='model path')
     parser.add_argument('--access_token', default=None, type=str, help='HuggingFace token to access llama3')
     parser.add_argument('--prompt_idx', default=None, type=int, help='optional, use to indicate you own prompt')
-    parser.add_argument('--iteration', default=-1, type=int, help='iteration')
-    parser.add_argument('--samples_per_job', default=8192, type=int, help='videos per job')
     args = parser.parse_args()
 
     #if args.access_token is None:
